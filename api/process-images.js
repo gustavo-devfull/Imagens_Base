@@ -12,47 +12,6 @@ const s3 = new AWS.S3({
   signatureVersion: 'v4'
 });
 
-// Função para baixar imagem
-async function downloadImage(url) {
-  try {
-    console.log(`Baixando imagem: ${url}`);
-    const response = await axios({
-      method: 'GET',
-      url: url,
-      responseType: 'arraybuffer',
-      timeout: 30000 // 30 segundos timeout
-    });
-    
-    console.log(`Imagem baixada com sucesso: ${response.data.length} bytes`);
-    return response.data;
-  } catch (error) {
-    console.error(`Erro ao baixar imagem ${url}:`, error.message);
-    throw new Error(`Erro ao baixar imagem: ${error.message}`);
-  }
-}
-
-// Função para fazer upload para DigitalOcean Spaces
-async function uploadToSpaces(imageBuffer, key) {
-  try {
-    console.log(`Fazendo upload para Spaces: ${key}`);
-    
-    const params = {
-      Bucket: 'moribr',
-      Key: `base-fotos/${key}`,
-      Body: imageBuffer,
-      ACL: 'public-read',
-      ContentType: 'image/jpeg'
-    };
-    
-    const result = await s3.upload(params).promise();
-    console.log(`Upload concluído: ${result.Location}`);
-    return result.Location;
-  } catch (error) {
-    console.error(`Erro no upload para Spaces:`, error.message);
-    throw new Error(`Erro ao fazer upload: ${error.message}`);
-  }
-}
-
 // Middleware para CORS
 function setCorsHeaders(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -78,9 +37,11 @@ export default async function handler(req, res) {
   try {
     const { refs, customNames } = req.body;
     
+    console.log('=== INÍCIO DO PROCESSAMENTO ===');
     console.log('Dados recebidos:', { refs, customNames });
     
     if (!refs || !Array.isArray(refs)) {
+      console.log('ERRO: Lista de REFs inválida');
       res.status(400).json({ error: 'Lista de REFs é obrigatória' });
       return;
     }
@@ -91,30 +52,58 @@ export default async function handler(req, res) {
       const ref = refs[i];
       const customName = customNames && customNames[i] ? customNames[i] : ref;
       
-      console.log(`Processando REF ${ref} -> Nome personalizado: ${customName}`);
+      console.log(`\n--- Processando REF ${i + 1}/${refs.length} ---`);
+      console.log(`REF: ${ref}`);
+      console.log(`Nome personalizado: ${customName}`);
       
       try {
         const imageUrl = `https://ideolog.ia.br/images/products/${ref}.jpg`;
         const filename = `${customName}.jpg`;
         
+        console.log(`URL da imagem: ${imageUrl}`);
+        console.log(`Nome do arquivo: ${filename}`);
+        
         // Baixar imagem
-        const imageBuffer = await downloadImage(imageUrl);
+        console.log('Iniciando download...');
+        const response = await axios({
+          method: 'GET',
+          url: imageUrl,
+          responseType: 'arraybuffer',
+          timeout: 30000,
+          headers: {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+          }
+        });
         
-        // Upload para Spaces usando o nome personalizado
-        const spacesUrl = await uploadToSpaces(imageBuffer, filename);
+        console.log(`Download concluído: ${response.data.length} bytes`);
         
-        console.log(`Sucesso: ${ref} -> ${filename} -> ${spacesUrl}`);
+        // Upload para Spaces
+        console.log('Iniciando upload para Spaces...');
+        const params = {
+          Bucket: 'moribr',
+          Key: `base-fotos/${filename}`,
+          Body: response.data,
+          ACL: 'public-read',
+          ContentType: 'image/jpeg'
+        };
+        
+        const uploadResult = await s3.upload(params).promise();
+        console.log(`Upload concluído: ${uploadResult.Location}`);
         
         results.push({
           ref: ref,
           customName: customName,
           filename: filename,
-          url: spacesUrl,
+          url: uploadResult.Location,
           success: true
         });
         
+        console.log(`✅ Sucesso: ${ref} -> ${filename}`);
+        
       } catch (error) {
-        console.error(`Erro ao processar ${ref}:`, error.message);
+        console.error(`❌ Erro ao processar ${ref}:`, error.message);
+        console.error('Detalhes do erro:', error);
+        
         results.push({
           ref: ref,
           customName: customName,
@@ -125,6 +114,11 @@ export default async function handler(req, res) {
       }
     }
     
+    console.log('\n=== RESULTADO FINAL ===');
+    console.log(`Total processado: ${results.length}`);
+    console.log(`Sucessos: ${results.filter(r => r.success).length}`);
+    console.log(`Erros: ${results.filter(r => !r.success).length}`);
+    
     res.json({
       success: true,
       results: results,
@@ -134,7 +128,9 @@ export default async function handler(req, res) {
     });
     
   } catch (error) {
+    console.error('=== ERRO GERAL ===');
     console.error('Erro no processamento:', error);
+    console.error('Stack trace:', error.stack);
     res.status(500).json({ error: error.message });
   }
 }
