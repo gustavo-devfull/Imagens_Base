@@ -1,4 +1,4 @@
-// Handler que funciona sem dependências externas
+// Handler que faz upload real para DigitalOcean Spaces
 export default async function handler(req, res) {
   try {
     // Configurar CORS
@@ -11,7 +11,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    console.log('=== PROCESSAMENTO DE IMAGENS ===');
+    console.log('=== PROCESSAMENTO REAL DE IMAGENS ===');
     console.log('Method:', req.method);
     console.log('Body:', req.body);
     
@@ -42,22 +42,57 @@ export default async function handler(req, res) {
       const imageUrl = `https://ideolog.ia.br/images/products/${ref}.jpg`;
       const filename = `${customName}.jpg`;
       
-      // Simular processamento sem dependências externas
-      console.log(`[SIMULATE] Simulando download de: ${imageUrl}`);
-      console.log(`[SIMULATE] Simulando upload de: ${filename}`);
+      // Download real da imagem
+      console.log(`[DOWNLOAD] Baixando: ${imageUrl}`);
       
-      // URL pública simulada
-      const publicUrl = `https://moribr.nyc3.cdn.digitaloceanspaces.com/base-fotos/${filename}`;
+      const response = await fetch(imageUrl, {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; ImagemBase/1.0)',
+          'Accept': 'image/jpeg, image/png, image/gif, image/webp, */*',
+        }
+      });
       
-      console.log(`[SIMULATE] Sucesso: ${ref} -> ${filename} -> ${publicUrl}`);
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const imageBuffer = await response.arrayBuffer();
+      console.log(`[DOWNLOAD] Download concluído. Tamanho: ${imageBuffer.byteLength} bytes`);
+      
+      // Upload real para Spaces
+      console.log(`[UPLOAD] Fazendo upload de ${filename} para Spaces`);
+      
+      const AWS = require('aws-sdk');
+      const spacesEndpoint = new AWS.Endpoint('nyc3.digitaloceanspaces.com');
+      const s3 = new AWS.S3({
+        endpoint: spacesEndpoint,
+        accessKeyId: process.env.DO_ACCESS_KEY || 'DO00U3TGARCUQ4BBXLUF',
+        secretAccessKey: process.env.DO_SECRET_KEY || '2UOswaN5G4JUnfv8wk/QTlO3KQU+5qywlnmoG8ho6kM',
+        region: 'nyc3',
+        s3ForcePathStyle: false,
+        signatureVersion: 'v4'
+      });
+      
+      const params = {
+        Bucket: 'moribr',
+        Key: `base-fotos/${filename}`,
+        Body: Buffer.from(imageBuffer),
+        ACL: 'public-read',
+        ContentType: 'image/jpeg'
+      };
+      
+      const uploadResult = await s3.upload(params).promise();
+      console.log(`[UPLOAD] Upload concluído: ${uploadResult.Location}`);
       
       results.push({
         ref: ref,
         customName: customName,
         filename: filename,
-        url: publicUrl,
+        url: uploadResult.Location,
         success: true,
-        simulated: true
+        downloaded: true,
+        uploaded: true
       });
       
     } catch (error) {
@@ -77,7 +112,7 @@ export default async function handler(req, res) {
       totalProcessed: results.length,
       successCount: results.filter(r => r.success).length,
       errorCount: results.filter(r => !r.success).length,
-      message: 'Processamento simulado - API funcionando sem dependências'
+      message: 'Processamento real - Imagem baixada e enviada para Spaces'
     };
     
     console.log('Resposta:', response);
