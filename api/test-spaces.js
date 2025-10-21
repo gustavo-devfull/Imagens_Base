@@ -30,7 +30,6 @@ export default async function handler(req, res) {
     console.log('=== TESTE DE CONEXÃO SPACES ===');
     console.log('Access Key presente:', !!accessKey);
     console.log('Secret Key presente:', !!secretKey);
-    console.log('Access Key (primeiros 10 chars):', accessKey ? accessKey.substring(0, 10) + '...' : 'NÃO DEFINIDA');
     
     if (!accessKey || !secretKey) {
       return res.status(500).json({
@@ -54,12 +53,13 @@ export default async function handler(req, res) {
       signatureVersion: 'v4'
     });
     
-    console.log('Tentando conectar ao bucket moribr...');
+    console.log('Testando conexão com bucket moribr...');
     
+    // Testar conexão e listar objetos
     const params = {
       Bucket: 'moribr',
       Prefix: 'base-fotos/',
-      MaxKeys: 1
+      MaxKeys: 5
     };
     
     const result = await s3.listObjectsV2(params).promise();
@@ -67,13 +67,26 @@ export default async function handler(req, res) {
     console.log('Conexão bem-sucedida!');
     console.log('Objetos encontrados:', result.Contents ? result.Contents.length : 0);
     
+    // Verificar URLs públicas dos objetos
+    const publicUrls = result.Contents ? result.Contents.map(obj => {
+      const publicUrl = `https://moribr.nyc3.cdn.digitaloceanspaces.com/${obj.Key}`;
+      return {
+        key: obj.Key,
+        size: obj.Size,
+        lastModified: obj.LastModified,
+        publicUrl: publicUrl
+      };
+    }) : [];
+    
     res.json({ 
       success: true, 
       message: 'Conexão com DigitalOcean Spaces OK',
       bucketContents: result.Contents ? result.Contents.length : 0,
       bucketName: 'moribr',
       region: 'nyc3',
-      endpoint: 'nyc3.digitaloceanspaces.com'
+      endpoint: 'nyc3.digitaloceanspaces.com',
+      cdnUrl: 'https://moribr.nyc3.cdn.digitaloceanspaces.com',
+      publicUrls: publicUrls
     });
     
   } catch (error) {
