@@ -1,0 +1,28 @@
+{
+  "name": "imagem-base-system",
+  "version": "1.0.0",
+  "description": "Sistema para processar planilhas e fazer upload de imagens para DigitalOcean Spaces",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "dependencies": {
+    "express": "^4.18.2",
+    "multer": "^1.4.5-lts.1",
+    "xlsx": "^0.18.5",
+    "csv-parser": "^3.0.0",
+    "aws-sdk": "^2.1490.0",
+    "axios": "^1.6.2",
+    "cors": "^2.8.5",
+    "path": "^0.12.7",
+    "fs": "^0.0.1-security"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "keywords": ["excel", "csv", "images", "digitalocean", "spaces"],
+  "author": "Gustavo",
+  "license": "MIT"
+}
+
