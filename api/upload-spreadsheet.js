@@ -1,20 +1,8 @@
 const multer = require('multer');
 const path = require('path');
-const AWS = require('aws-sdk');
 const XLSX = require('xlsx');
 const csv = require('csv-parser');
 const { Readable } = require('stream');
-
-// Configuração do DigitalOcean Spaces
-const spacesEndpoint = new AWS.Endpoint('nyc3.digitaloceanspaces.com');
-const s3 = new AWS.S3({
-  endpoint: spacesEndpoint,
-  accessKeyId: process.env.DO_ACCESS_KEY || 'DO00U3TGARCUQ4BBXLUF',
-  secretAccessKey: process.env.DO_SECRET_KEY || '2UOswaN5G4JUnfv8wk/QTlO3KQU+5qywlnmoG8ho6kM',
-  region: 'nyc3',
-  s3ForcePathStyle: false,
-  signatureVersion: 'v4'
-});
 
 // Configuração do multer para upload de arquivos (memória para Vercel)
 const upload = multer({ 
@@ -82,75 +70,65 @@ export default async function handler(req, res) {
   }
 
   try {
-    return new Promise((resolve) => {
-      upload.single('spreadsheet')(req, res, async (err) => {
+    // Usar multer para processar o upload
+    await new Promise((resolve, reject) => {
+      upload.single('spreadsheet')(req, res, (err) => {
         if (err) {
+          console.error('Erro no multer:', err);
           res.status(400).json({ error: err.message });
-          resolve();
+          reject(err);
           return;
         }
-
-        try {
-          if (!req.file) {
-            res.status(400).json({ error: 'Nenhum arquivo enviado' });
-            resolve();
-            return;
-          }
-          
-          const fileBuffer = req.file.buffer;
-          const fileExt = path.extname(req.file.originalname).toLowerCase();
-          
-          let data;
-          
-          if (fileExt === '.csv') {
-            data = await readCSVFromBuffer(fileBuffer);
-          } else {
-            data = readExcelFromBuffer(fileBuffer);
-          }
-          
-          // Verificar se existe campo REF
-          if (data.length === 0) {
-            res.status(400).json({ error: 'Planilha vazia' });
-            resolve();
-            return;
-          }
-          
-          const firstRow = data[0];
-          const refField = Object.keys(firstRow).find(key => 
-            key.toLowerCase().includes('ref') || 
-            key.toLowerCase().includes('referencia') ||
-            key.toLowerCase().includes('código')
-          );
-          
-          if (!refField) {
-            res.status(400).json({ error: 'Campo REF não encontrado na planilha' });
-            resolve();
-            return;
-          }
-          
-          // Filtrar apenas linhas com REF válido
-          const validRows = data.filter(row => row[refField] && row[refField].toString().trim() !== '');
-          
-          res.json({
-            success: true,
-            data: validRows,
-            refField: refField,
-            totalRows: validRows.length
-          });
-          resolve();
-          
-        } catch (error) {
-          console.error('Erro no upload:', error);
-          res.status(500).json({ error: error.message });
-          resolve();
-        }
+        resolve();
       });
+    });
+
+    if (!req.file) {
+      res.status(400).json({ error: 'Nenhum arquivo enviado' });
+      return;
+    }
+    
+    const fileBuffer = req.file.buffer;
+    const fileExt = path.extname(req.file.originalname).toLowerCase();
+    
+    let data;
+    
+    if (fileExt === '.csv') {
+      data = await readCSVFromBuffer(fileBuffer);
+    } else {
+      data = readExcelFromBuffer(fileBuffer);
+    }
+    
+    // Verificar se existe campo REF
+    if (data.length === 0) {
+      res.status(400).json({ error: 'Planilha vazia' });
+      return;
+    }
+    
+    const firstRow = data[0];
+    const refField = Object.keys(firstRow).find(key => 
+      key.toLowerCase().includes('ref') || 
+      key.toLowerCase().includes('referencia') ||
+      key.toLowerCase().includes('código')
+    );
+    
+    if (!refField) {
+      res.status(400).json({ error: 'Campo REF não encontrado na planilha' });
+      return;
+    }
+    
+    // Filtrar apenas linhas com REF válido
+    const validRows = data.filter(row => row[refField] && row[refField].toString().trim() !== '');
+    
+    res.json({
+      success: true,
+      data: validRows,
+      refField: refField,
+      totalRows: validRows.length
     });
     
   } catch (error) {
-    console.error('Erro geral:', error);
+    console.error('Erro no upload:', error);
     res.status(500).json({ error: error.message });
   }
 }
-
-export default handler;
