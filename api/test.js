@@ -1,4 +1,4 @@
-// Handler simples para teste
+// API de teste ultra simples
 export default async function handler(req, res) {
   // Configurar CORS
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -10,21 +10,23 @@ export default async function handler(req, res) {
     return;
   }
 
-  if (req.method !== 'GET') {
+  if (req.method !== 'POST') {
     res.status(405).json({ error: 'Método não permitido' });
     return;
   }
 
   try {
-    res.json({ 
-      success: true, 
-      message: 'API funcionando corretamente',
-      timestamp: new Date().toISOString()
+    console.log('=== TESTE SIMPLES ===');
+    
+    res.json({
+      success: true,
+      message: 'API de teste funcionando',
+      timestamp: new Date().toISOString(),
+      method: req.method
     });
+    
   } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      error: error.message 
-    });
+    console.error('ERRO:', error);
+    res.status(500).json({ error: error.message });
   }
 }
