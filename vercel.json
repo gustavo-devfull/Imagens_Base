@@ -1,9 +1,16 @@
 {
-  "functions": {
-    "api/*.js": {
-      "runtime": "nodejs18.x"
+  "builds": [
+    {
+      "src": "api/*.js",
+      "use": "@vercel/node"
     }
-  },
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/$1"
+    }
+  ],
   "env": {
     "DO_ACCESS_KEY": "DO00U3TGARCUQ4BBXLUF",
     "DO_SECRET_KEY": "2UOswaN5G4JUnfv8wk/QTlO3KQU+5qywlnmoG8ho6kM"
