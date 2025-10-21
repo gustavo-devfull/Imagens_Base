@@ -1,4 +1,4 @@
-// Handler que funciona sem dependências externas
+// Handler que usa fetch nativo para download
 export default async function handler(req, res) {
   try {
     // Configurar CORS
@@ -11,7 +11,7 @@ export default async function handler(req, res) {
       return;
     }
 
-    console.log('=== PROCESSAMENTO DE IMAGENS ===');
+    console.log('=== PROCESSAMENTO COM FETCH NATIVO ===');
     console.log('Method:', req.method);
     console.log('Body:', req.body);
     
@@ -42,14 +42,31 @@ export default async function handler(req, res) {
       const imageUrl = `https://ideolog.ia.br/images/products/${ref}.jpg`;
       const filename = `${customName}.jpg`;
       
-      // Simular processamento sem dependências externas
-      console.log(`[SIMULATE] Simulando download de: ${imageUrl}`);
-      console.log(`[SIMULATE] Simulando upload de: ${filename}`);
+      // Usar fetch nativo para download
+      console.log(`[DOWNLOAD] Baixando: ${imageUrl}`);
+      
+      const response = await fetch(imageUrl, {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; ImagemBase/1.0)',
+          'Accept': 'image/jpeg, image/png, image/gif, image/webp, */*',
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+      
+      const imageBuffer = await response.arrayBuffer();
+      console.log(`[DOWNLOAD] Download concluído. Tamanho: ${imageBuffer.byteLength} bytes`);
+      
+      // Simular upload para Spaces (sem AWS SDK por enquanto)
+      console.log(`[UPLOAD] Simulando upload de ${filename} para Spaces`);
       
       // URL pública simulada
       const publicUrl = `https://moribr.nyc3.cdn.digitaloceanspaces.com/base-fotos/${filename}`;
       
-      console.log(`[SIMULATE] Sucesso: ${ref} -> ${filename} -> ${publicUrl}`);
+      console.log(`[SUCCESS] Sucesso: ${ref} -> ${filename} -> ${publicUrl}`);
       
       results.push({
         ref: ref,
@@ -57,7 +74,8 @@ export default async function handler(req, res) {
         filename: filename,
         url: publicUrl,
         success: true,
-        simulated: true
+        downloaded: true,
+        uploaded: false // Simulado por enquanto
       });
       
     } catch (error) {
@@ -77,7 +95,7 @@ export default async function handler(req, res) {
       totalProcessed: results.length,
       successCount: results.filter(r => r.success).length,
       errorCount: results.filter(r => !r.success).length,
-      message: 'Processamento simulado - API funcionando sem dependências'
+      message: 'Download real com fetch nativo - Upload simulado'
     };
     
     console.log('Resposta:', response);
