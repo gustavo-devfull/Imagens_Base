@@ -503,7 +503,7 @@
                 uploadBtn.disabled = true;
                 uploadBtn.textContent = 'Processando...';
 
-                const response = await fetch('/upload-spreadsheet', {
+                const response = await fetch('/api/upload-spreadsheet', {
                     method: 'POST',
                     body: formData
                 });
@@ -656,7 +656,7 @@
             document.getElementById('loading').style.display = 'block';
 
             try {
-                const response = await fetch('/process-images', {
+                const response = await fetch('/api/process-images', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
@@ -741,7 +741,7 @@
                 testConnectionBtn.disabled = true;
                 testConnectionBtn.textContent = 'Testando...';
 
-                const response = await fetch('/test-spaces');
+                const response = await fetch('/api/test-spaces');
                 const result = await response.json();
 
                 if (result.success) {

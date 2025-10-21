@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "builds": [
+    {
+      "src": "api/index.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/(.*)",
+      "dest": "/api/index.js"
+    },
+    {
+      "src": "/(.*)",
+      "dest": "/public/$1"
+    }
+  ],
+  "env": {
+    "DO_ACCESS_KEY": "DO00U3TGARCUQ4BBXLUF",
+    "DO_SECRET_KEY": "2UOswaN5G4JUnfv8wk/QTlO3KQU+5qywlnmoG8ho6kM"
+  }
+}
