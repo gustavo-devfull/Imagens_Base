@@ -1,17 +1,6 @@
 const AWS = require('aws-sdk');
 const axios = require('axios');
 
-// Configuração do DigitalOcean Spaces
-const spacesEndpoint = new AWS.Endpoint('nyc3.digitaloceanspaces.com');
-const s3 = new AWS.S3({
-  endpoint: spacesEndpoint,
-  accessKeyId: process.env.DO_ACCESS_KEY || 'DO00U3TGARCUQ4BBXLUF',
-  secretAccessKey: process.env.DO_SECRET_KEY || '2UOswaN5G4JUnfv8wk/QTlO3KQU+5qywlnmoG8ho6kM',
-  region: 'nyc3',
-  s3ForcePathStyle: false,
-  signatureVersion: 'v4'
-});
-
 // Middleware para CORS
 function setCorsHeaders(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -46,9 +35,56 @@ export default async function handler(req, res) {
       return;
     }
     
-    // Limitar a 1 imagem por vez para evitar timeout
+    // Verificar variáveis de ambiente primeiro
+    const accessKey = process.env.DO_ACCESS_KEY;
+    const secretKey = process.env.DO_SECRET_KEY;
+    
+    console.log('Verificando variáveis de ambiente...');
+    console.log('Access Key presente:', !!accessKey);
+    console.log('Secret Key presente:', !!secretKey);
+    
+    if (!accessKey || !secretKey) {
+      console.log('ERRO: Variáveis de ambiente não configuradas');
+      res.status(500).json({
+        success: false,
+        error: 'Variáveis de ambiente do DigitalOcean Spaces não configuradas',
+        details: {
+          DO_ACCESS_KEY: !!accessKey,
+          DO_SECRET_KEY: !!secretKey
+        }
+      });
+      return;
+    }
+    
+    // Configuração do DigitalOcean Spaces
+    const spacesEndpoint = new AWS.Endpoint('nyc3.digitaloceanspaces.com');
+    const s3 = new AWS.S3({
+      endpoint: spacesEndpoint,
+      accessKeyId: accessKey,
+      secretAccessKey: secretKey,
+      region: 'nyc3',
+      s3ForcePathStyle: false,
+      signatureVersion: 'v4'
+    });
+    
+    // Testar conexão primeiro
+    console.log('Testando conexão com Spaces...');
+    try {
+      await s3.headBucket({ Bucket: 'moribr' }).promise();
+      console.log('✅ Conexão com Spaces OK');
+    } catch (error) {
+      console.error('❌ Erro na conexão com Spaces:', error.message);
+      res.status(500).json({
+        success: false,
+        error: 'Erro na conexão com DigitalOcean Spaces',
+        details: error.message
+      });
+      return;
+    }
+    
+    // Processar apenas a primeira imagem para teste
     const refsToProcess = refs.slice(0, 1);
-    console.log(`Processando apenas ${refsToProcess.length} imagem(s) para evitar timeout`);
+    console.log(`Processando ${refsToProcess.length} imagem(s) para teste`);
     
     const results = [];
     
@@ -67,14 +103,14 @@ export default async function handler(req, res) {
         console.log(`URL da imagem: ${imageUrl}`);
         console.log(`Nome do arquivo: ${filename}`);
         
-        // Baixar imagem com configurações otimizadas
+        // Baixar imagem
         console.log('Iniciando download...');
         const response = await axios({
           method: 'GET',
           url: imageUrl,
           responseType: 'arraybuffer',
-          timeout: 15000, // Reduzido para 15 segundos
-          maxContentLength: 10 * 1024 * 1024, // Limite de 10MB
+          timeout: 10000,
+          maxContentLength: 5 * 1024 * 1024, // Limite de 5MB
           headers: {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
             'Accept': 'image/jpeg,image/jpg,image/png,*/*'
@@ -83,7 +119,6 @@ export default async function handler(req, res) {
         
         console.log(`Download concluído: ${response.data.length} bytes`);
         
-        // Verificar se a imagem é válida
         if (response.data.length === 0) {
           throw new Error('Imagem vazia ou não encontrada');
         }
@@ -118,7 +153,6 @@ export default async function handler(req, res) {
       } catch (error) {
         console.error(`❌ Erro ao processar ${ref}:`, error.message);
         
-        // Determinar tipo de erro
         let errorMessage = error.message;
         if (error.code === 'ECONNABORTED') {
           errorMessage = 'Timeout no download da imagem';
@@ -149,7 +183,7 @@ export default async function handler(req, res) {
       totalProcessed: results.length,
       successCount: results.filter(r => r.success).length,
       errorCount: results.filter(r => !r.success).length,
-      message: refs.length > 1 ? `Processado apenas 1 de ${refs.length} imagens para evitar timeout` : 'Processamento concluído'
+      message: refs.length > 1 ? `Processado apenas 1 de ${refs.length} imagens para teste` : 'Processamento concluído'
     });
     
   } catch (error) {
