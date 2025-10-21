@@ -15,14 +15,18 @@ const s3 = new AWS.S3({
 // Função para baixar imagem
 async function downloadImage(url) {
   try {
+    console.log(`Baixando imagem: ${url}`);
     const response = await axios({
       method: 'GET',
       url: url,
-      responseType: 'arraybuffer'
+      responseType: 'arraybuffer',
+      timeout: 30000 // 30 segundos timeout
     });
     
+    console.log(`Imagem baixada com sucesso: ${response.data.length} bytes`);
     return response.data;
   } catch (error) {
+    console.error(`Erro ao baixar imagem ${url}:`, error.message);
     throw new Error(`Erro ao baixar imagem: ${error.message}`);
   }
 }
@@ -30,6 +34,8 @@ async function downloadImage(url) {
 // Função para fazer upload para DigitalOcean Spaces
 async function uploadToSpaces(imageBuffer, key) {
   try {
+    console.log(`Fazendo upload para Spaces: ${key}`);
+    
     const params = {
       Bucket: 'moribr',
       Key: `base-fotos/${key}`,
@@ -39,8 +45,10 @@ async function uploadToSpaces(imageBuffer, key) {
     };
     
     const result = await s3.upload(params).promise();
+    console.log(`Upload concluído: ${result.Location}`);
     return result.Location;
   } catch (error) {
+    console.error(`Erro no upload para Spaces:`, error.message);
     throw new Error(`Erro ao fazer upload: ${error.message}`);
   }
 }
@@ -130,5 +138,3 @@ export default async function handler(req, res) {
     res.status(500).json({ error: error.message });
   }
 }
-
-export default handler;
