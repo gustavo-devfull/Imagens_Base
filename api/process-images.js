@@ -46,13 +46,17 @@ export default async function handler(req, res) {
       return;
     }
     
+    // Limitar a 1 imagem por vez para evitar timeout
+    const refsToProcess = refs.slice(0, 1);
+    console.log(`Processando apenas ${refsToProcess.length} imagem(s) para evitar timeout`);
+    
     const results = [];
     
-    for (let i = 0; i < refs.length; i++) {
-      const ref = refs[i];
+    for (let i = 0; i < refsToProcess.length; i++) {
+      const ref = refsToProcess[i];
       const customName = customNames && customNames[i] ? customNames[i] : ref;
       
-      console.log(`\n--- Processando REF ${i + 1}/${refs.length} ---`);
+      console.log(`\n--- Processando REF ${i + 1}/${refsToProcess.length} ---`);
       console.log(`REF: ${ref}`);
       console.log(`Nome personalizado: ${customName}`);
       
@@ -63,19 +67,26 @@ export default async function handler(req, res) {
         console.log(`URL da imagem: ${imageUrl}`);
         console.log(`Nome do arquivo: ${filename}`);
         
-        // Baixar imagem
+        // Baixar imagem com configurações otimizadas
         console.log('Iniciando download...');
         const response = await axios({
           method: 'GET',
           url: imageUrl,
           responseType: 'arraybuffer',
-          timeout: 30000,
+          timeout: 15000, // Reduzido para 15 segundos
+          maxContentLength: 10 * 1024 * 1024, // Limite de 10MB
           headers: {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+            'Accept': 'image/jpeg,image/jpg,image/png,*/*'
           }
         });
         
         console.log(`Download concluído: ${response.data.length} bytes`);
+        
+        // Verificar se a imagem é válida
+        if (response.data.length === 0) {
+          throw new Error('Imagem vazia ou não encontrada');
+        }
         
         // Upload para Spaces
         console.log('Iniciando upload para Spaces...');
@@ -84,7 +95,11 @@ export default async function handler(req, res) {
           Key: `base-fotos/${filename}`,
           Body: response.data,
           ACL: 'public-read',
-          ContentType: 'image/jpeg'
+          ContentType: 'image/jpeg',
+          Metadata: {
+            'original-ref': ref,
+            'custom-name': customName
+          }
         };
         
         const uploadResult = await s3.upload(params).promise();
@@ -102,13 +117,22 @@ export default async function handler(req, res) {
         
       } catch (error) {
         console.error(`❌ Erro ao processar ${ref}:`, error.message);
-        console.error('Detalhes do erro:', error);
+        
+        // Determinar tipo de erro
+        let errorMessage = error.message;
+        if (error.code === 'ECONNABORTED') {
+          errorMessage = 'Timeout no download da imagem';
+        } else if (error.response && error.response.status === 404) {
+          errorMessage = 'Imagem não encontrada no servidor';
+        } else if (error.code === 'ENOTFOUND') {
+          errorMessage = 'Erro de conexão com o servidor';
+        }
         
         results.push({
           ref: ref,
           customName: customName,
           filename: `${customName}.jpg`,
-          error: error.message,
+          error: errorMessage,
           success: false
         });
       }
@@ -124,7 +148,8 @@ export default async function handler(req, res) {
       results: results,
       totalProcessed: results.length,
       successCount: results.filter(r => r.success).length,
-      errorCount: results.filter(r => !r.success).length
+      errorCount: results.filter(r => !r.success).length,
+      message: refs.length > 1 ? `Processado apenas 1 de ${refs.length} imagens para evitar timeout` : 'Processamento concluído'
     });
     
   } catch (error) {
