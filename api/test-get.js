@@ -1,4 +1,4 @@
-// Handler que aceita GET e POST para debug
+// Handler que aceita GET para teste
 export default async function handler(req, res) {
   try {
     // Configurar CORS
@@ -11,36 +11,24 @@ export default async function handler(req, res) {
       return;
     }
 
-    console.log('=== DEBUG API ===');
+    console.log('=== TESTE GET ===');
     console.log('Method:', req.method);
     console.log('URL:', req.url);
-    console.log('Headers:', req.headers);
-    console.log('Body:', req.body);
     
-    // Resposta simples para qualquer método
-    const response = {
+    // Resposta simples
+    res.status(200).json({
       success: true,
-      message: 'API funcionando',
+      message: 'Teste GET funcionando',
       timestamp: new Date().toISOString(),
       method: req.method,
-      url: req.url,
-      bodyReceived: !!req.body,
-      bodyType: typeof req.body,
-      bodyKeys: req.body ? Object.keys(req.body) : []
-    };
-    
-    console.log('Resposta:', response);
-    
-    res.status(200).json(response);
+      url: req.url
+    });
     
   } catch (error) {
-    console.error('ERRO CRÍTICO:', error);
-    console.error('Stack:', error.stack);
-    
+    console.error('ERRO:', error);
     res.status(500).json({
       success: false,
-      error: error.message,
-      stack: error.stack
+      error: error.message
     });
   }
 }
