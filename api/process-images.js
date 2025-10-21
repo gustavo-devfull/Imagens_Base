@@ -1,4 +1,4 @@
-// Handler que aceita GET e POST para debug
+// Handler que processa imagens corretamente
 export default async function handler(req, res) {
   try {
     // Configurar CORS
@@ -11,22 +11,48 @@ export default async function handler(req, res) {
       return;
     }
 
-    console.log('=== DEBUG API ===');
+    console.log('=== PROCESSAMENTO DE IMAGENS ===');
     console.log('Method:', req.method);
-    console.log('URL:', req.url);
-    console.log('Headers:', req.headers);
     console.log('Body:', req.body);
     
-    // Resposta simples para qualquer método
+    if (req.method !== 'POST') {
+      res.status(405).json({ error: 'Método não permitido' });
+      return;
+    }
+
+    const { refs, customNames } = req.body;
+    
+    console.log('REFs recebidos:', refs);
+    console.log('Nomes personalizados:', customNames);
+    
+    if (!refs || !Array.isArray(refs)) {
+      res.status(400).json({ error: 'Lista de REFs é obrigatória' });
+      return;
+    }
+    
+    // Simular processamento sem operações reais
+    const results = refs.map((ref, index) => {
+      const customName = customNames && customNames[index] ? customNames[index] : ref;
+      
+      console.log(`Processando: ${ref} -> ${customName}`);
+      
+      return {
+        ref: ref,
+        customName: customName,
+        filename: `${customName}.jpg`,
+        url: `https://moribr.nyc3.cdn.digitaloceanspaces.com/base-fotos/${customName}.jpg`,
+        success: true,
+        simulated: true
+      };
+    });
+    
     const response = {
       success: true,
-      message: 'API funcionando',
-      timestamp: new Date().toISOString(),
-      method: req.method,
-      url: req.url,
-      bodyReceived: !!req.body,
-      bodyType: typeof req.body,
-      bodyKeys: req.body ? Object.keys(req.body) : []
+      results: results,
+      totalProcessed: results.length,
+      successCount: results.filter(r => r.success).length,
+      errorCount: results.filter(r => !r.success).length,
+      message: 'Processamento simulado - API funcionando'
     };
     
     console.log('Resposta:', response);
